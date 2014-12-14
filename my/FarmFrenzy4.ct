@@ -2,27 +2,13 @@
 <CheatTable CheatEngineTableVersion="18">
   <CheatEntries>
     <CheatEntry>
-      <ID>10</ID>
+      <ID>1</ID>
       <Description>"Money"</Description>
       <Options moHideChildren="1"/>
       <LastState Activated="0"/>
       <Color>80000008</Color>
       <VariableType>Auto Assembler Script</VariableType>
-      <AssemblerScript>/*
- * Game Title:      Farm Frenzy 4 (Steam edition, with achievements)
- * Process Name:    FarmFrenzy4.exe
- * Script Version:  1.0
- * CE Version:      6.4
- * Author:          Yuri Sakhno (George1)
- * Release Date:    14-Dec-2014
- *
- * Ensures you never go broke
- *
- * History:
- *   14-Dec-14:  Added minimum money feature
- */
-
-[ENABLE]
+      <AssemblerScript>[ENABLE]
 
 // The Change Money AOB-scan targets the following code:
 // 8B 86 9C 06 00 00     mov eax, [esi+69C]
@@ -120,9 +106,51 @@ unregistersymbol(_changeMoney);
           <Color>008000</Color>
           <VariableType>4 Bytes</VariableType>
           <Address>bEnableMinMoney</Address>
+          <Hotkeys>
+            <Hotkey>
+              <Action>Set Value</Action>
+              <Keys>
+                <Key>17</Key>
+                <Key>97</Key>
+              </Keys>
+              <Value>0</Value>
+              <Description>Allow money to change freely</Description>
+              <ID>0</ID>
+            </Hotkey>
+            <Hotkey>
+              <Action>Set Value</Action>
+              <Keys>
+                <Key>17</Key>
+                <Key>35</Key>
+              </Keys>
+              <Value>0</Value>
+              <Description>Allow money to change freely</Description>
+              <ID>1</ID>
+            </Hotkey>
+            <Hotkey>
+              <Action>Set Value</Action>
+              <Keys>
+                <Key>17</Key>
+                <Key>103</Key>
+              </Keys>
+              <Value>1</Value>
+              <Description>Make money never go below certain limit</Description>
+              <ID>2</ID>
+            </Hotkey>
+            <Hotkey>
+              <Action>Set Value</Action>
+              <Keys>
+                <Key>17</Key>
+                <Key>36</Key>
+              </Keys>
+              <Value>1</Value>
+              <Description>Make money never go below certain limit</Description>
+              <ID>3</ID>
+            </Hotkey>
+          </Hotkeys>
           <CheatEntries>
             <CheatEntry>
-              <ID>12</ID>
+              <ID>111</ID>
               <Description>"Minimum money value"</Description>
               <LastState Value="??" Activated="0" RealAddress="00000000"/>
               <Color>808000</Color>
@@ -132,7 +160,7 @@ unregistersymbol(_changeMoney);
           </CheatEntries>
         </CheatEntry>
         <CheatEntry>
-          <ID>13</ID>
+          <ID>12</ID>
           <Description>"Current money ==&gt;"</Description>
           <LastState Value="??" Activated="0" RealAddress="00000000"/>
           <Color>808080</Color>
@@ -151,21 +179,7 @@ unregistersymbol(_changeMoney);
       <LastState Activated="0"/>
       <Color>80000008</Color>
       <VariableType>Auto Assembler Script</VariableType>
-      <AssemblerScript>/*
- * Game Title:      Farm Frenzy 4 (Steam edition, with achievements)
- * Process Name:    FarmFrenzy4.exe
- * Script Version:  1.0
- * CE Version:      6.4
- * Author:          Yuri Sakhno (George1)
- * Release Date:    14-Dec-2014
- *
- * Allows to manipulate timers in various ways
- *
- * History:
- *   14-Dec-14:  Initial release
- */
-
-[ENABLE]
+      <AssemblerScript>[ENABLE]
 
 // The Compute Ticks AOB-scan targets the following code:
 // 8B 3D ?? ?? ?? ??        mov edi, ds:GetTickCount
@@ -316,7 +330,7 @@ unregistersymbol(_computeTicks);
 </AssemblerScript>
       <CheatEntries>
         <CheatEntry>
-          <ID>3</ID>
+          <ID>21</ID>
           <Description>"Freeze Elapsed Time"</Description>
           <DropDownList ReadOnly="1" DescriptionOnly="1" DisplayValueAsItem="1">0:Do not freeze
 1:Freeze timer
@@ -369,7 +383,7 @@ unregistersymbol(_computeTicks);
           </Hotkeys>
         </CheatEntry>
         <CheatEntry>
-          <ID>4</ID>
+          <ID>22</ID>
           <Description>"Adjust speed of Elapsed Time timer by ==&gt;"</Description>
           <DropDownList DescriptionOnly="1" DisplayValueAsItem="1">1:Normal timer speed
 0.6666666865:1.5x slower
@@ -386,7 +400,7 @@ unregistersymbol(_computeTicks);
           <Address>fSlowdownTimerCoef</Address>
         </CheatEntry>
         <CheatEntry>
-          <ID>5</ID>
+          <ID>23</ID>
           <Description>"Adjust speed of product animations by ==&gt;"</Description>
           <DropDownList DescriptionOnly="1" DisplayValueAsItem="1">1:Normal animations speed
 0.6666666865:1.5x slower
@@ -402,7 +416,7 @@ unregistersymbol(_computeTicks);
           <Address>fSlowdownAnimTimerCoef</Address>
         </CheatEntry>
         <CheatEntry>
-          <ID>6</ID>
+          <ID>24</ID>
           <Description>"Current timer value, in milliseconds ==&gt;"</Description>
           <LastState Value="??" Activated="0" RealAddress="00000000"/>
           <Color>808080</Color>
@@ -413,7 +427,7 @@ unregistersymbol(_computeTicks);
           </Offsets>
         </CheatEntry>
         <CheatEntry>
-          <ID>7</ID>
+          <ID>25</ID>
           <Description>"Reset Elapsed Time"</Description>
           <LastState Value="??" Activated="0" RealAddress="00000000"/>
           <Color>909090</Color>
@@ -514,17 +528,42 @@ unregistersymbol(_computeTicks);
       </After>
     </CodeEntry>
   </CheatCodes>
-  <UserdefinedSymbols>
-    <SymbolEntry>
-      <Name>iEnableGMS</Name>
-      <Address>240F05CF</Address>
-    </SymbolEntry>
-  </UserdefinedSymbols>
-  <DisassemblerComments>
-    <DisassemblerComment>
-      <Address>"FarmFrenzy4.exe"+508EB</Address>
-      <Comment>Current level time manipulation
-</Comment>
-    </DisassemblerComment>
-  </DisassemblerComments>
+  <UserdefinedSymbols/>
+  <Comments>==========================================
+ Game Title:      Farm Frenzy 4 (Steam edition, with achievements)
+ Process Name:    FarmFrenzy4.exe
+ Script Version:  1.0
+ CE Version:      6.4
+ Author:          Yuri Sakhno (George1)
+ Release Date:    14-Dec-2014
+ 
+ Features:
+   + Allows to make Money never go less than certain value
+   + Elapsed Time timer freezing
+   + Change the speed at which Elapsed Time timer counts time
+   + Change the speed of some animations (useful for catching produce mid-air)
+ 
+ History:
+   14-Dec-14:  Initial release; Money and Timers supported
+==========================================
+ How to use:
+   Activate the script by clicking on an empty box next to the function
+   in Cheat Engine's list. Then change values of the options you desire
+   to activate.
+
+   Note: If the top-level function (like Money or Timer) does not expand when
+   you click in the empty box, it means that your game is not compatible with
+   this version of the table.
+==========================================
+ Hot Keys:
+   Ctrl+Home  - Make money never go below certain limit
+   Ctrl+End   - Allow money to change freely (normal behavior)
+   Ctrl+Ins   - Unfreeze the Elapsed Time
+   Ctrl+Del   - Freeze the Elapsed Time
+   Ctrl+Grey/ - Reset current Elapsed Time back to 00:00
+
+   Note: money-related hot keys only work if you've activated the Money function.
+   Timer-related hot keys only work if you've activated the Timer function.
+==========================================
+</Comments>
 </CheatTable>
