@@ -1,0 +1,530 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CheatTable CheatEngineTableVersion="18">
+  <CheatEntries>
+    <CheatEntry>
+      <ID>10</ID>
+      <Description>"Money"</Description>
+      <Options moHideChildren="1"/>
+      <LastState Activated="0"/>
+      <Color>80000008</Color>
+      <VariableType>Auto Assembler Script</VariableType>
+      <AssemblerScript>/*
+ * Game Title:      Farm Frenzy 4 (Steam edition, with achievements)
+ * Process Name:    FarmFrenzy4.exe
+ * Script Version:  1.0
+ * CE Version:      6.4
+ * Author:          Yuri Sakhno (George1)
+ * Release Date:    14-Dec-2014
+ *
+ * Ensures you never go broke
+ *
+ * History:
+ *   14-Dec-14:  Added minimum money feature
+ */
+
+[ENABLE]
+
+// The Change Money AOB-scan targets the following code:
+// 8B 86 9C 06 00 00     mov eax, [esi+69C]
+// 8D 0C 38              lea ecx, [eax+edi]
+// 3B C1                 cmp eax, ecx
+// 0F 46 C1              cmovbe eax, ecx
+// 89 8E 9C 06 00 00     mov [esi+69C], ecx
+aobscanmodule(changeMoney, FarmFrenzy4.exe, 8B 86 9C 06 00 00 8D 0C 38 3B C1 0F 46 C1 89 8E 9C 06 00 00);
+registersymbol(_changeMoney);
+label(_changeMoney);
+
+alloc(newmem, 1024);
+
+label(changeMoneyHook);
+label(originalCode);
+label(return);
+
+label(pState);
+registersymbol(pState);
+label(bEnableMinMoney);
+registersymbol(bEnableMinMoney);
+label(dwMinMoney);
+registersymbol(dwMinMoney);
+
+newmem:
+
+/*
+ * ================================  Variables  ================================
+ */
+
+// Address of the memory that contains current money value, among other things
+pState:
+    dd 0
+// Determines whether the money value should never go less than dwMinMoney.
+// Any non-zero value means TRUE
+bEnableMinMoney:
+    dd 0
+// The default value for minimum money. Can be altered by user via CE interface
+dwMinMoney:
+    dd #1000
+
+
+/*
+ * ============================  Actual hooks code =============================
+ */
+
+//// Hook for the routine that changes money ///////////////////////////////////
+changeMoneyHook:
+    // Memorize the address of memory with game state
+    // (used to display this info in CE interface)
+    mov [pState], esi
+
+    cmp [bEnableMinMoney], 0
+    jz originalCode
+    cmp ecx, [dwMinMoney] // If the player currently has more than dwMinMoney money,
+    jae originalCode // go to original code since we don't want to lock the money,
+                     // only to prevent ir from going lower than dwMinMoney
+    mov ecx, [dwMinMoney] // Set the money to the minimum desired value
+
+originalCode:
+    mov [esi+69C], ecx
+    jmp return
+
+
+/*
+ * =================================  Patches  =================================
+ */
+changeMoney+E:
+_changeMoney:
+    jmp changeMoneyHook
+    nop
+return:
+
+[DISABLE]
+dealloc(newmem);
+
+_changeMoney:
+    mov [esi+69C], ecx
+//  db 89 8E 9C 06 00 00
+
+unregistersymbol(dwMinMoney);
+unregistersymbol(bEnableMinMoney);
+unregistersymbol(pState);
+unregistersymbol(_changeMoney);
+
+</AssemblerScript>
+      <CheatEntries>
+        <CheatEntry>
+          <ID>11</ID>
+          <Description>"Enable minimum money"</Description>
+          <DropDownList ReadOnly="1" DescriptionOnly="1" DisplayValueAsItem="1">0:Off
+1:On
+</DropDownList>
+          <LastState Value="??" Activated="0" RealAddress="00000000"/>
+          <Color>008000</Color>
+          <VariableType>4 Bytes</VariableType>
+          <Address>bEnableMinMoney</Address>
+          <CheatEntries>
+            <CheatEntry>
+              <ID>12</ID>
+              <Description>"Minimum money value"</Description>
+              <LastState Value="??" Activated="0" RealAddress="00000000"/>
+              <Color>808000</Color>
+              <VariableType>4 Bytes</VariableType>
+              <Address>dwMinMoney</Address>
+            </CheatEntry>
+          </CheatEntries>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>13</ID>
+          <Description>"Current money ==&gt;"</Description>
+          <LastState Value="??" Activated="0" RealAddress="00000000"/>
+          <Color>808080</Color>
+          <VariableType>4 Bytes</VariableType>
+          <Address>pState</Address>
+          <Offsets>
+            <Offset>69C</Offset>
+          </Offsets>
+        </CheatEntry>
+      </CheatEntries>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>2</ID>
+      <Description>"Timer"</Description>
+      <Options moHideChildren="1"/>
+      <LastState Activated="0"/>
+      <Color>80000008</Color>
+      <VariableType>Auto Assembler Script</VariableType>
+      <AssemblerScript>/*
+ * Game Title:      Farm Frenzy 4 (Steam edition, with achievements)
+ * Process Name:    FarmFrenzy4.exe
+ * Script Version:  1.0
+ * CE Version:      6.4
+ * Author:          Yuri Sakhno (George1)
+ * Release Date:    14-Dec-2014
+ *
+ * Allows to manipulate timers in various ways
+ *
+ * History:
+ *   14-Dec-14:  Initial release
+ */
+
+[ENABLE]
+
+// The Compute Ticks AOB-scan targets the following code:
+// 8B 3D ?? ?? ?? ??        mov edi, ds:GetTickCount
+// 8D 73 08                 lea esi, [ebx+8]
+// C7 45 08 03 00 00 00     mov [ebp+8], 3
+aobscanmodule(computeTicks, FarmFrenzy4.exe, 8B 3D ?? ?? ?? ?? 8D 73 08 C7 45 08 03 00 00 00);
+registersymbol(_computeTicks);
+label(_computeTicks);
+
+// The HUD AOB-scan targets the following code:
+// 8B 40 30       mov eax, [eax+30]
+// 2B C7          sub eax, edi
+// 8D 4C 24 18    lea ecx, [esp+18]
+// E8 ........    call ........
+aobscanmodule(hud, FarmFrenzy4.exe, 8B 40 30 2B C7 8D 4C 24 18 E8);
+registersymbol(_hud);
+label(_hud);
+
+alloc(newmem, 1024);
+
+label(timerHook);
+label(freezeTimer);
+label(doSlowdowns);
+label(originalComputeTicksCode);
+label(hudHook);
+label(originalHudCode);
+label(returnComputeTicks);
+label(returnHud);
+
+label(pTimers);
+registersymbol(pTimers);
+label(bFreezeTimer);
+registersymbol(bFreezeTimer);
+label(bResetTimer);
+registersymbol(bResetTimer);
+label(fSlowdownTimerCoef);
+registersymbol(fSlowdownTimerCoef);
+label(fSlowdownAnimTimerCoef);
+registersymbol(fSlowdownAnimTimerCoef);
+
+
+newmem:
+
+/*
+ * ================================  Variables  ================================
+ */
+
+// Address of the structure containing 3 timers
+pTimers:
+    dd 0
+// Determines whether the Elapsed Time timer will be paused. Any non-zero value means TRUE
+bFreezeTimer:
+    dd 0
+// Whether the Elapsed Time should be reset back to 00:00 mid-level
+bResetTimer:
+    dd 0
+// Coeficient that is used to multiply the timer increment each iteration
+fSlowdownTimerCoef:
+    dd 3F800000 // it's a float value, it means 1.0
+// Same purpose as for fSlowdownTimerCoef, only for a different timer
+fSlowdownAnimTimerCoef:
+    dd 3F800000 // same here as above
+
+
+/*
+ * ============================  Actual hooks code =============================
+ */
+
+//// Hook for the routine that updates timers //////////////////////////////////
+timerHook:
+    mov [pTimers], ebx // Memorize the address of the timers structure
+
+    cmp [bFreezeTimer], 0
+    jnz freezeTimer
+    cmp [fSlowdownTimerCoef], 0
+    jnz doSlowdowns
+
+freezeTimer:
+    // Clear the flag so the timer will think the game is 'paused'
+    mov byte ptr [ebx+40], 0
+
+doSlowdowns:
+    // Handle speed of the Elapsed Time timer
+    mov esi, [fSlowdownTimerCoef]
+    mov [ebx+3C], esi
+
+    // Handle speed of the animations timer
+    mov esi, [fSlowdownAnimTimerCoef]
+    mov [ebx+14], esi
+
+originalComputeTicksCode:
+    lea esi, [ebx+8]
+    mov [ebp+8], 3
+    jmp returnComputeTicks
+
+//// Hook for the routine that updates HUD /////////////////////////////////////
+hudHook:
+    cmp [bResetTimer], 0
+    jz originalHudCode
+    mov [eax+30], edi // Copy level start time back into the timer, effectively resetting it
+    and [bResetTimer], 0 // Set the Reset Timer variable back to 0
+
+originalHudCode:
+    mov eax, [eax+30]
+    sub eax, edi
+    jmp returnHud
+
+
+/*
+ * =================================  Patches  =================================
+ */
+computeTicks+6:
+_computeTicks:
+    jmp timerHook
+    nop
+    nop
+    nop
+    nop
+    nop
+returnComputeTicks:
+
+hud:
+_hud:
+    jmp hudHook
+returnHud:
+
+[DISABLE]
+dealloc(newmem);
+
+_hud:
+    mov eax, [eax+30]
+    sub eax, edi
+//  db 8B 40 30 2B C7
+
+_computeTicks:
+    lea esi, [ebx+8]
+    mov [ebp+8], 3
+//  db 8D 73 08 C7 45 08 03 00 00 00
+
+unregistersymbol(fSlowdownAnimTimerCoef);
+unregistersymbol(fSlowdownTimerCoef);
+unregistersymbol(bResetTimer);
+unregistersymbol(bFreezeTimer);
+unregistersymbol(pTimers);
+unregistersymbol(_hud);
+unregistersymbol(_computeTicks);
+
+</AssemblerScript>
+      <CheatEntries>
+        <CheatEntry>
+          <ID>3</ID>
+          <Description>"Freeze Elapsed Time"</Description>
+          <DropDownList ReadOnly="1" DescriptionOnly="1" DisplayValueAsItem="1">0:Do not freeze
+1:Freeze timer
+</DropDownList>
+          <LastState Value="??" Activated="0" RealAddress="00000000"/>
+          <Color>008000</Color>
+          <VariableType>4 Bytes</VariableType>
+          <Address>bFreezeTimer</Address>
+          <Hotkeys>
+            <Hotkey>
+              <Action>Set Value</Action>
+              <Keys>
+                <Key>17</Key>
+                <Key>96</Key>
+              </Keys>
+              <Value>0</Value>
+              <Description>Unfreezes the timer</Description>
+              <ID>0</ID>
+            </Hotkey>
+            <Hotkey>
+              <Action>Set Value</Action>
+              <Keys>
+                <Key>17</Key>
+                <Key>45</Key>
+              </Keys>
+              <Value>0</Value>
+              <Description>Unfreezes the timer</Description>
+              <ID>1</ID>
+            </Hotkey>
+            <Hotkey>
+              <Action>Set Value</Action>
+              <Keys>
+                <Key>17</Key>
+                <Key>110</Key>
+              </Keys>
+              <Value>1</Value>
+              <Description>Freezes the timer</Description>
+              <ID>2</ID>
+            </Hotkey>
+            <Hotkey>
+              <Action>Set Value</Action>
+              <Keys>
+                <Key>17</Key>
+                <Key>46</Key>
+              </Keys>
+              <Value>1</Value>
+              <Description>Freezes the timer</Description>
+              <ID>3</ID>
+            </Hotkey>
+          </Hotkeys>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>4</ID>
+          <Description>"Adjust speed of Elapsed Time timer by ==&gt;"</Description>
+          <DropDownList DescriptionOnly="1" DisplayValueAsItem="1">1:Normal timer speed
+0.6666666865:1.5x slower
+0.5:2x slower
+0.3333333433:3x slower
+0.25:4x slower
+0.200000003:5x slower
+0.1000000015:10x slower
+0:Freeze the timer
+</DropDownList>
+          <LastState Value="??" Activated="0" RealAddress="00000000"/>
+          <Color>800000</Color>
+          <VariableType>Float</VariableType>
+          <Address>fSlowdownTimerCoef</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>5</ID>
+          <Description>"Adjust speed of product animations by ==&gt;"</Description>
+          <DropDownList DescriptionOnly="1" DisplayValueAsItem="1">1:Normal animations speed
+0.6666666865:1.5x slower
+0.5:2x slower
+0.3333333433:3x slower
+0.25:4x slower
+0.200000003:5x slower
+0.1000000015:10x slower
+</DropDownList>
+          <LastState Value="??" Activated="0" RealAddress="00000000"/>
+          <Color>800000</Color>
+          <VariableType>Float</VariableType>
+          <Address>fSlowdownAnimTimerCoef</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>6</ID>
+          <Description>"Current timer value, in milliseconds ==&gt;"</Description>
+          <LastState Value="??" Activated="0" RealAddress="00000000"/>
+          <Color>808080</Color>
+          <VariableType>4 Bytes</VariableType>
+          <Address>pTimers</Address>
+          <Offsets>
+            <Offset>30</Offset>
+          </Offsets>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>7</ID>
+          <Description>"Reset Elapsed Time"</Description>
+          <LastState Value="??" Activated="0" RealAddress="00000000"/>
+          <Color>909090</Color>
+          <VariableType>4 Bytes</VariableType>
+          <Address>bResetTimer</Address>
+          <Hotkeys>
+            <Hotkey>
+              <Action>Set Value</Action>
+              <Keys>
+                <Key>17</Key>
+                <Key>111</Key>
+              </Keys>
+              <Value>1</Value>
+              <Description>Forces reset of Elapsed Time</Description>
+              <ID>0</ID>
+            </Hotkey>
+          </Hotkeys>
+        </CheatEntry>
+      </CheatEntries>
+    </CheatEntry>
+  </CheatEntries>
+  <CheatCodes>
+    <CodeEntry>
+      <Description>Prepare timer for display</Description>
+      <Address>010808EB</Address>
+      <ModuleName>FarmFrenzy4.exe</ModuleName>
+      <ModuleNameOffset>508EB</ModuleNameOffset>
+      <Before>
+        <Byte>E8</Byte>
+        <Byte>CE</Byte>
+        <Byte>5E</Byte>
+        <Byte>0B</Byte>
+        <Byte>00</Byte>
+      </Before>
+      <Actual>
+        <Byte>8B</Byte>
+        <Byte>40</Byte>
+        <Byte>30</Byte>
+      </Actual>
+      <After>
+        <Byte>2B</Byte>
+        <Byte>C7</Byte>
+        <Byte>8D</Byte>
+        <Byte>4C</Byte>
+        <Byte>24</Byte>
+      </After>
+    </CodeEntry>
+    <CodeEntry>
+      <Description>Change timer</Description>
+      <Address>0113687A</Address>
+      <ModuleName>FarmFrenzy4.exe</ModuleName>
+      <ModuleNameOffset>10687A</ModuleNameOffset>
+      <Before>
+        <Byte>E8</Byte>
+        <Byte>3C</Byte>
+        <Byte>8A</Byte>
+        <Byte>1B</Byte>
+        <Byte>00</Byte>
+      </Before>
+      <Actual>
+        <Byte>01</Byte>
+        <Byte>06</Byte>
+      </Actual>
+      <After>
+        <Byte>89</Byte>
+        <Byte>46</Byte>
+        <Byte>04</Byte>
+        <Byte>EB</Byte>
+        <Byte>04</Byte>
+      </After>
+    </CodeEntry>
+    <CodeEntry>
+      <Description>Change money</Description>
+      <Address>01038C4D</Address>
+      <ModuleName>FarmFrenzy4.exe</ModuleName>
+      <ModuleNameOffset>8C4D</ModuleNameOffset>
+      <Before>
+        <Byte>3B</Byte>
+        <Byte>C1</Byte>
+        <Byte>0F</Byte>
+        <Byte>46</Byte>
+        <Byte>C1</Byte>
+      </Before>
+      <Actual>
+        <Byte>89</Byte>
+        <Byte>8E</Byte>
+        <Byte>9C</Byte>
+        <Byte>06</Byte>
+        <Byte>00</Byte>
+        <Byte>00</Byte>
+      </Actual>
+      <After>
+        <Byte>8B</Byte>
+        <Byte>CE</Byte>
+        <Byte>89</Byte>
+        <Byte>86</Byte>
+        <Byte>B4</Byte>
+      </After>
+    </CodeEntry>
+  </CheatCodes>
+  <UserdefinedSymbols>
+    <SymbolEntry>
+      <Name>iEnableGMS</Name>
+      <Address>240F05CF</Address>
+    </SymbolEntry>
+  </UserdefinedSymbols>
+  <DisassemblerComments>
+    <DisassemblerComment>
+      <Address>"FarmFrenzy4.exe"+508EB</Address>
+      <Comment>Current level time manipulation
+</Comment>
+    </DisassemblerComment>
+  </DisassemblerComments>
+</CheatTable>

@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CheatTable CheatEngineTableVersion="16">
+  <CheatEntries>
+    <CheatEntry>
+      <ID>1</ID>
+      <Description>"[X] &lt;== Cities in Motion v1.0.22 (Steam) Script 1.0"</Description>
+      <Options moHideChildren="1"/>
+      <Color>80000008</Color>
+      <VariableType>Auto Assembler Script</VariableType>
+      <AssemblerScript>/*
+ * Game Title:     Cities in Motion
+ * Game Version:   1.0.22 (Steam)
+ * Proces Name:    Cities In Motion.exe
+ * Script Version: 1.0
+ * CE Version:     6.3
+ * Author:         Yuri Sakhno (George1)
+ * Release date:   6-Jan-2014
+ *
+ * History:
+ *   6-Jan-14: Initial release; Money, Capacious Vehicles that do not break down
+ *
+ * Features:
+ *   + Freezing money at 75k
+ *   + Vehicles with infinite capacity
+ *   + Vehicles do not break down
+ */
+
+[ENABLE]
+aobscan(moneyPatch, 8B 49 08 8B 04 81 83 C4 2C C2 04 00);
+label(_moneyPatch);
+registersymbol(_moneyPatch);
+aobscan(capacityPatch, 8B B8 74 01 00 00 03 B8 70 01 00 00 3B B8 6C 01 00 00);
+label(_capacityPatch);
+registersymbol(_capacityPatch);
+aobscan(breakdownPatch, 33 ED D9 46 3C D8 1D ?? ?? ?? ?? DF E0 F6 C4 05 0F 8A);
+label(_breakdownPatch);
+registersymbol(_breakdownPatch);
+
+alloc(newmem, 2048);
+label(lotsaMoney);
+label(returnLotsaMoney);
+label(originalMoneyCode);
+label(infiniteCapacity);
+label(returnInfiniteCapacity);
+label(originalCapacityCode);
+label(noBreakDown);
+label(returnBreakDown);
+label(originalBreakDownCode);
+
+label(bFreezeMoney);
+registersymbol(bFreezeMoney);
+label(bInfiniteCapacity);
+registersymbol(bInfiniteCapacity);
+label(bNoBreakDowns);
+registersymbol(bNoBreakDowns);
+
+
+newmem:
+
+
+/*
+ * ================================  Variables  ================================
+ */
+
+bFreezeMoney:
+    dd 0
+bInfiniteCapacity:
+    dd 0
+bNoBreakDowns:
+    dd 0
+
+
+/*
+ * ====================  New code that does all the things  ====================
+ */
+
+/*
+ * Money-related code
+ */
+lotsaMoney:
+    mov ecx, [ecx+8]
+    cmp [bFreezeMoney], 0
+    jz originalMoneyCode
+    cmp ebx, 3
+    jne originalMoneyCode
+    cmp eax, 2
+    jne originalMoneyCode
+    mov eax, [ecx+eax*4]
+
+    // Next piece of code multiplies 75000 by 100. This is not actually needed
+    // now (one could simply assign 7500000), but it is here in favor of future
+    // support for the amount to be specified by the user via CE interface
+    mov ecx, #75000
+    shl ecx, 2
+    mov ebx, ecx
+    shl ecx, 3
+    add ebx, ecx
+    shl ecx, 1
+    add ebx, ecx
+
+    // Store the computed value at the appropriate location
+    mov dword ptr [eax+8], ebx
+    jmp returnLotsaMoney
+
+originalMoneyCode:
+    mov eax, [ecx+eax*4]
+    jmp returnLotsaMoney
+
+/*
+ * Capacity-related code
+ */
+infiniteCapacity:
+    cmp [bInfiniteCapacity], 0
+    jz originalCapacityCode
+
+    // At this point EDI contains number of people already
+    // on board plus the number of people that want to get in.
+    // This is later compared with total capacity
+    xor edi, edi // Set EDI to zero now
+    dec edi // Make it even smaller so that it would be less than any capacity!
+
+originalCapacityCode:
+    cmp edi, [eax+16C] // Do actual comparison and return, original code will check flags on its own
+    jmp returnInfiniteCapacity
+
+/*
+ * Break down-related code
+ */
+noBreakDown:
+    cmp [bNoBreakDowns], 0
+    jz originalBreakDownCode
+
+    mov ax, 73 // When vehicle is brand new, fnstsw pulls this value into AX
+    test ah, 5
+    jmp returnBreakDown
+
+originalBreakDownCode:
+    fnstsw ax
+    test ah, 5
+    jmp returnBreakDown
+
+
+/*
+ * =================================  Patches  =================================
+ */
+
+moneyPatch:
+_moneyPatch:
+    jmp lotsaMoney
+    nop
+returnLotsaMoney:
+
+capacityPatch+C:
+_capacityPatch:
+    jmp infiniteCapacity
+    nop
+returnInfiniteCapacity:
+
+breakdownPatch+B:
+_breakdownPatch:
+    jmp noBreakDown
+returnBreakDown:
+
+
+[DISABLE]
+dealloc(newmem)
+_moneyPatch:
+    mov ecx, [ecx+8]
+    mov eax, [ecx+eax*4]
+// db 8B 49 08 8B 04 81
+
+_capacityPatch:
+    cmp edi, [eax+16C]
+// db 3B B8 6C 01 00 00
+
+_breakdownPatch:
+    fnstsw ax
+    test ah, 5
+// db DF E0 F6 C4 05
+
+unregistersymbol(bNoBreakDowns);
+unregistersymbol(bInfiniteCapacity);
+unregisterSymbol(bFreezeMoney);
+unregistersymbol(_breakdownPatch);
+unregistersymbol(_capacityPatch);
+unregistersymbol(_moneyPatch);
+
+</AssemblerScript>
+      <CheatEntries>
+        <CheatEntry>
+          <ID>2</ID>
+          <Description>"Freeze Money at 75k"</Description>
+          <Color>80000008</Color>
+          <VariableType>4 Bytes</VariableType>
+          <Address>bFreezeMoney</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>3</ID>
+          <Description>"Infinite Capacity Vehicles"</Description>
+          <Color>80000008</Color>
+          <VariableType>4 Bytes</VariableType>
+          <Address>bInfiniteCapacity</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>4</ID>
+          <Description>"No Vehicle Break-downs"</Description>
+          <Color>80000008</Color>
+          <VariableType>4 Bytes</VariableType>
+          <Address>bNoBreakDowns</Address>
+        </CheatEntry>
+      </CheatEntries>
+    </CheatEntry>
+  </CheatEntries>
+  <UserdefinedSymbols/>
+</CheatTable>
