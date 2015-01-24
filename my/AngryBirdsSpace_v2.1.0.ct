@@ -1,0 +1,349 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CheatTable CheatEngineTableVersion="18">
+  <CheatEntries>
+    <CheatEntry>
+      <ID>1</ID>
+      <Description>"Control the last-shot Bird"</Description>
+      <LastState Activated="0"/>
+      <Color>80000008</Color>
+      <VariableType>Auto Assembler Script</VariableType>
+      <AssemblerScript>/*
+ * Game Title:     Angry Birds Space
+ * Game Version:   2.1.0 (Steam)
+ * Proces Name:    AngryBirdsSpace.exe
+ * Script Version: 1.0
+ * CE Version:     6.4
+ * Author:         Yuri Sakhno (George1)
+ * Release date:   24-Jan-2015
+ *
+ * History:
+ *   24-Jan-15: Initial release; Bird movement
+ *
+ * Features:
+ *   + Bird movement
+ */
+
+[ENABLE]
+
+// The Remember Bird Ptr AOB-scan targets the following code:
+// 55                    push ebp
+// 8B EC                 mov ebp, esp
+// 83 EC 08              sub esp, 8
+// 83 39 02              cmp dword ptr [ecx], 2
+// 0F ?? ?? ?? 00 00     jXX +0000????
+aobscanmodule(rememberBirdPtr, AngryBirdsSpace.exe, 55 8B EC 83 EC 08 83 39 02 0F ?? ?? ?? 00 00);
+registersymbol(_rememberBirdPtr);
+label(_rememberBirdPtr);
+
+// The Main Update Loop AOB-scan targets the following code:
+// 83 39 02              cmp dword ptr [ecx], 2
+// D9 41 38              fld dword ptr [ecx+38]
+// 8B 41 2C              mov eax, [ecx+2C]
+aobscanmodule(mainUpdateLoop, AngryBirdsSpace.exe, 83 39 02 D9 41 38 8B 41 2C);
+registersymbol(mainUpdateLoop);
+
+alloc(newmem, 1024);
+
+label(rememberBirdPtrHook);
+label(mainUpdateLoopOriginalCode);
+label(rememberBirdPtrReturn);
+label(mainUpdateLoopHook);
+label(mainUpdateLoopReturn);
+
+label(doMoveLeft);
+label(doMoveRight):
+label(doMoveUp);
+label(doMoveDown);
+
+label(pBird);
+registersymbol(pBird);
+label(dwKeyLeft);
+registersymbol(dwKeyLeft);
+label(dwKeyRight);
+registersymbol(dwKeyRight);
+label(dwKeyUp);
+registersymbol(dwKeyUp);
+label(dwKeyDown);
+registersymbol(dwKeyDown);
+label(fSpeedMoveLeft);
+registersymbol(fSpeedMoveLeft);
+label(fSpeedMoveRight);
+registersymbol(fSpeedMoveRight);
+label(fSpeedMoveUp);
+registersymbol(fSpeedMoveUp);
+label(fSpeedMoveDown);
+registersymbol(fSpeedMoveDown);
+label(bInMirrorWorld);
+registersymbol(bInMirrorWorld);
+label(bPressedLeft);
+label(bPressedRight);
+label(bPressedUp);
+label(bPressedDown);
+
+newmem:
+
+/*
+ * ================================  Variables  ================================
+ */
+
+// Address of the bird that needs to be manipulated
+pBird:
+    dd 0
+// Virtual key code of the key to use to move the bird left
+dwKeyLeft:
+    dd 2E // Delete key (VK_DELETE)
+// Virtual key code of the key to use to move the bird right
+dwKeyRight:
+    dd 22 // Page Down key (VK_NEXT)
+// Virtual key code of the key to use to move the bird up
+dwKeyUp:
+    dd 24 // Home key (VK_HOME)
+// Virtual key code of the key to use to move the bird down
+dwKeyDown:
+    dd 23 // End key (VK_END)
+// The speed at which the bird is moved to the left each iteration
+fSpeedMoveLeft:
+    dd 3F800000 // it's a float value, it means 1.0
+// The speed at which the bird is moved to the right each iteration
+fSpeedMoveRight:
+    dd 3F800000 // same as above
+// The speed at which the bird is moved up each iteration
+fSpeedMoveUp:
+    dd 3F800000 // again
+// The speed at which the bird is moved down each iteration
+fSpeedMoveDown:
+    dd 3F800000 // and yet again
+// Determines whether left and right controls should be switched (1 - yes)
+bInMirrorWorld:
+    dd 0
+// Determines whether 'move left' key is now pressed
+bPressedLeft:
+    db 0
+// Determines whether 'move right' key is now pressed
+bPressedRight:
+    db 0
+// Determines whether 'move up' key is now pressed
+bPressedUp:
+    db 0
+// Determines whether 'move down' key is now pressed
+bPressedDown:
+    db 0
+
+
+/*
+ * ============================  Actual hooks code =============================
+ */
+
+//// Hook for the routine called when the bird is being pulled in slingshot ////
+rememberBirdPtrHook:
+    mov [pBird], ecx // The pointer to the bird in question is in ECX
+    // Do original code now and return
+    mov ebp, esp
+    sub esp, 8
+    jmp rememberBirdPtrReturn
+
+//// Hook for the main update loop /////////////////////////////////////////////
+mainUpdateLoopHook:
+    cmp ecx, [pBird] // Check if the correct bird is being manipulated
+    jne mainUpdateLoopOriginalCode // If not, skip to original code
+
+    // Save EAX, ECX and EDX since Win32 API may modify them
+    push eax
+    push ecx
+    push edx
+
+    // Get state (pressed or not) of the 'move left' key
+    mov eax, [dwKeyLeft]
+    push eax
+    call GetAsyncKeyState
+    mov [bPressedLeft], ah
+
+    // Get state of the 'move right' key
+    mov eax, [dwKeyRight]
+    push eax
+    call GetAsyncKeyState
+    mov [bPressedRight], ah
+
+    // Get state of the 'move up' key
+    mov eax, [dwKeyUp]
+    push eax
+    call GetAsyncKeyState
+    mov [bPressedUp], ah
+
+    // Get state of the 'move down' key
+    mov eax, [dwKeyDown]
+    push eax
+    call GetAsyncKeyState
+    mov [bPressedDown], ah
+
+    // Restore EDX, ECX and EAX back
+    pop edx
+    pop ecx
+    pop eax
+
+doMoveLeft: // This section processes 'move left' key press
+    test byte ptr [bPressedLeft], 80
+    jz doMoveRight
+    fld dword ptr [ecx+2C] // memory at offset 2C contains X-coord of the bird
+    fsub dword ptr [fSpeedMoveLeft] // to move left, speed should be subtracted
+    fstp dword ptr [ecx+2C]
+
+doMoveRight: // This section processes 'move right' key press
+    test byte ptr [bPressedRight], 80
+    jz doMoveUp
+    fld dword ptr [ecx+2C]
+    fadd dword ptr [fSpeedMoveRight] // to move right, speed should be added
+    fstp dword ptr [ecx+2C]
+
+doMoveUp: // This section processes 'move up' key press
+    test byte ptr [bPressedUp], 80
+    jz doMoveDown
+    fld dword ptr [ecx+30] // memory at offset 30 contains Y-coord of the bird
+    fsub dword ptr [fSpeedMoveUp] // to move up, speed should be subtracted
+    fstp dword ptr [ecx+30]
+
+doMoveDown: // This section processes 'move down' key press
+    test byte ptr [bPressedDown], 80
+    jz mainUpdateLoopOriginalCode
+    fld dword ptr [ecx+30]
+    fadd dword ptr [fSpeedMoveDown] // to move down, speed should be added
+    fstp dword ptr [ecx+30]
+
+mainUpdateLoopOriginalCode:
+    // Do original code
+    cmp dword ptr [ecx], 2
+    fld dword ptr [ecx+38]
+    jmp mainUpdateLoopReturn
+
+
+/*
+ * =================================  Patches  =================================
+ */
+
+rememberBirdPtr+1:
+_rememberBirdPtr:
+    jmp rememberBirdPtrHook
+rememberBirdPtrReturn:
+
+mainUpdateLoop:
+    jmp mainUpdateLoopHook
+    nop
+mainUpdateLoopReturn:
+
+[DISABLE]
+dealloc(newmem);
+
+_rememberBirdPtr:
+    mov ebp, esp
+    sub esp, 8
+//  db 8B EC 83 EC 08
+
+mainUpdateLoop:
+    cmp dword ptr [ecx], 2
+    fld dword ptr [ecx+38]
+//  db 83 39 02 D9 41 38
+
+unregistersymbol(bInMirrorWorld);
+unregistersymbol(fSpeedMoveDown);
+unregistersymbol(fSpeedMoveUp);
+unregistersymbol(fSpeedMoveRight);
+unregistersymbol(fSpeedMoveLeft);
+unregistersymbol(dwKeyDown);
+unregistersymbol(dwKeyUp);
+unregistersymbol(dwKeyRight);
+unregistersymbol(dwKeyLeft);
+unregistersymbol(pBird);
+unregisterSymbol(mainUpdateLoop);
+unregistersymbol(_rememberBirdPtr);
+
+</AssemblerScript>
+    </CheatEntry>
+  </CheatEntries>
+  <CheatCodes>
+    <CodeEntry>
+      <Description>Bird pull (in slingshot)</Description>
+      <Address>01032736</Address>
+      <ModuleName>AngryBirdsSpace.exe</ModuleName>
+      <ModuleNameOffset>12736</ModuleNameOffset>
+      <Before>
+        <Byte>8B</Byte>
+        <Byte>EC</Byte>
+        <Byte>83</Byte>
+        <Byte>EC</Byte>
+        <Byte>08</Byte>
+      </Before>
+      <Actual>
+        <Byte>83</Byte>
+        <Byte>39</Byte>
+        <Byte>02</Byte>
+      </Actual>
+      <After>
+        <Byte>0F</Byte>
+        <Byte>85</Byte>
+        <Byte>84</Byte>
+        <Byte>00</Byte>
+        <Byte>00</Byte>
+      </After>
+    </CodeEntry>
+    <CodeEntry>
+      <Description>Main update loop</Description>
+      <Address>011C005F</Address>
+      <ModuleName>AngryBirdsSpace.exe</ModuleName>
+      <ModuleNameOffset>1A005F</ModuleNameOffset>
+      <Before>
+        <Byte>46</Byte>
+        <Byte>08</Byte>
+        <Byte>8B</Byte>
+        <Byte>0C</Byte>
+        <Byte>B8</Byte>
+      </Before>
+      <Actual>
+        <Byte>83</Byte>
+        <Byte>39</Byte>
+        <Byte>02</Byte>
+      </Actual>
+      <After>
+        <Byte>D9</Byte>
+        <Byte>41</Byte>
+        <Byte>38</Byte>
+        <Byte>8B</Byte>
+        <Byte>41</Byte>
+      </After>
+    </CodeEntry>
+  </CheatCodes>
+  <UserdefinedSymbols/>
+  <Comments>==========================================
+ Game Title:      Angry Birds Space
+ Game Version:    2.1.0 (Steam)
+ Process Name:    AngryBirdsSpace.exe
+ Script Version:  1.0
+ CE Version:      6.4
+ Author:          Yuri Sakhno (George1)
+ Release Date:    24-Jan-2015
+ 
+ Features:
+   + Allows to control the last-shot bird with keyboard
+ 
+ History:
+   24-Jan-15:  Initial release; Bird movement
+==========================================
+ How to use:
+   Activate the script by clicking on an empty box next to the function
+   in Cheat Engine's list. Then change values of the options you desire
+   to activate.
+
+   Note: If the top-level function does not expand when you click in
+   the empty box, it means that your game is not compatible with this
+   version of the table.
+==========================================
+ Hot Keys:
+   Backspace  - Toggle the world (Mirror or Normal)
+   ]          - to the Normal world!
+   [          - to the Mirror world!
+
+ Note: The world-switching hot keys do not switch the actual world in game;
+   it is rather an indication to the cheat-script how to interpret left-right
+   movement keys when you are controlling the bird with keyboard.
+==========================================
+</Comments>
+</CheatTable>
