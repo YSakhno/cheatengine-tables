@@ -4,6 +4,7 @@
     <CheatEntry>
       <ID>1</ID>
       <Description>"Control the last-shot Bird"</Description>
+      <Options moHideChildren="1"/>
       <LastState Activated="0"/>
       <Color>80000008</Color>
       <VariableType>Auto Assembler Script</VariableType>
@@ -45,13 +46,18 @@ registersymbol(mainUpdateLoop);
 alloc(newmem, 1024);
 
 label(rememberBirdPtrHook);
-label(mainUpdateLoopOriginalCode);
+label(rememberBirdPtrOriginalCode);
 label(rememberBirdPtrReturn);
 label(mainUpdateLoopHook);
+label(mainUpdateLoopOriginalCode);
 label(mainUpdateLoopReturn);
 
+label(doRememberBirdPtr);
+label(pollKeyboardState);
 label(doMoveLeft);
-label(doMoveRight):
+label(doMoveLeftAction);
+label(doMoveRight);
+label(doMoveRightAction);
 label(doMoveUp);
 label(doMoveDown);
 
@@ -65,6 +71,8 @@ label(dwKeyUp);
 registersymbol(dwKeyUp);
 label(dwKeyDown);
 registersymbol(dwKeyDown);
+label(dwKeyRememberBird);
+registersymbol(dwKeyRememberBird);
 label(fSpeedMoveLeft);
 registersymbol(fSpeedMoveLeft);
 label(fSpeedMoveRight);
@@ -73,8 +81,12 @@ label(fSpeedMoveUp);
 registersymbol(fSpeedMoveUp);
 label(fSpeedMoveDown);
 registersymbol(fSpeedMoveDown);
+label(bAlwaysRememberBird);
+registersymbol(bAlwaysRememberBird);
 label(bInMirrorWorld);
 registersymbol(bInMirrorWorld);
+label(bToggleMirrorWorld);
+registersymbol(bToggleMirrorWorld);
 label(bPressedLeft);
 label(bPressedRight);
 label(bPressedUp);
@@ -101,20 +113,29 @@ dwKeyUp:
 // Virtual key code of the key to use to move the bird down
 dwKeyDown:
     dd 23 // End key (VK_END)
+// Virtual key code of the key to use to remember the bird to control
+dwKeyRememberBird:
+    dd 20 // Space key (VK_SPACE)
 // The speed at which the bird is moved to the left each iteration
 fSpeedMoveLeft:
-    dd 3F800000 // it's a float value, it means 1.0
+    dd (float)1.0
 // The speed at which the bird is moved to the right each iteration
 fSpeedMoveRight:
-    dd 3F800000 // same as above
+    dd (float)1.0
 // The speed at which the bird is moved up each iteration
 fSpeedMoveUp:
-    dd 3F800000 // again
+    dd (float)1.0
 // The speed at which the bird is moved down each iteration
 fSpeedMoveDown:
-    dd 3F800000 // and yet again
+    dd (float)1.0
+// Whether the bird should always be rememebered (without the need to press a key)
+bAlwaysRememberBird:
+    dd 0
 // Determines whether left and right controls should be switched (1 - yes)
 bInMirrorWorld:
+    dd 0
+// Whether bInMirrorWorld should be toggled from 0 to 1 and vice versa
+bToggleMirrorWorld:
     dd 0
 // Determines whether 'move left' key is now pressed
 bPressedLeft:
@@ -136,7 +157,31 @@ bPressedDown:
 
 //// Hook for the routine called when the bird is being pulled in slingshot ////
 rememberBirdPtrHook:
-    mov [pBird], ecx // The pointer to the bird in question is in ECX
+    // Skip keyboard polling if bAlwaysRememberBird is not zero
+    cmp [bAlwaysRememberBird], 0
+    jnz doRememberBirdPtr
+
+    // Save EAX, ECX and EDX since Win32 API may modify them
+    push eax
+    push ecx
+    push edx
+
+    // Get state (pressed or not) of the 'remember bird' key
+    mov eax, [dwKeyRememberBird]
+    push eax
+    call GetAsyncKeyState
+    test ah, 80 // Test whether the 'remember bird' key is pressed
+
+    // Restore EDX, ECX and EAX back
+    pop edx
+    pop ecx
+    pop eax
+    jz rememberBirdPtrOriginalCode // Skip next instruction if the key isn't being pressed
+
+doRememberBirdPtr:
+    mov [pBird], ecx // Store pointer to the bird
+
+rememberBirdPtrOriginalCode:
     // Do original code now and return
     mov ebp, esp
     sub esp, 8
@@ -147,6 +192,14 @@ mainUpdateLoopHook:
     cmp ecx, [pBird] // Check if the correct bird is being manipulated
     jne mainUpdateLoopOriginalCode // If not, skip to original code
 
+    // Check to see if request to toggle bInMirrorWorld has been issued
+    cmp [bToggleMirrorWorld], 0
+    jz pollKeyboardState // If such request wasn't issued, on to keyboard polling
+    xor [bInMirrorWorld], 1 // Toggle the least significant bit of the flag
+    and [bToggleMirrorWorld], 0 // Reset the request variable back to zero
+    and [bInMirrorWorld], 1 // Reset all other bits of the flag to 0
+
+pollKeyboardState:
     // Save EAX, ECX and EDX since Win32 API may modify them
     push eax
     push ecx
@@ -185,15 +238,28 @@ doMoveLeft: // This section processes 'move left' key press
     test byte ptr [bPressedLeft], 80
     jz doMoveRight
     fld dword ptr [ecx+2C] // memory at offset 2C contains X-coord of the bird
-    fsub dword ptr [fSpeedMoveLeft] // to move left, speed should be subtracted
+    fld dword ptr [fSpeedMoveLeft]
+    cmp [bInMirrorWorld], 0
+    jz doMoveLeftAction
+    fchs // to move left in Mirror World, speed should be added, not subtracted
+doMoveLeftAction:
+    fsubp // st(1) &lt;== st(1)-st(0); pop st
+//    fsub dword ptr [fSpeedMoveLeft] // to move left, speed should be subtracted
     fstp dword ptr [ecx+2C]
 
 doMoveRight: // This section processes 'move right' key press
     test byte ptr [bPressedRight], 80
     jz doMoveUp
     fld dword ptr [ecx+2C]
-    fadd dword ptr [fSpeedMoveRight] // to move right, speed should be added
+    fld dword ptr [fSpeedMoveRight]
+    cmp [bInMirrorWorld], 0
+    jz doMoveRightAction
+    fchs // to move right in Mirror World, speed should be subtracted, not added
+//    fadd dword ptr [fSpeedMoveRight] // to move right, speed should be added
+doMoveRightAction:
+    faddp // st(1) &lt;== st(0)+st(1); pop st
     fstp dword ptr [ecx+2C]
+
 
 doMoveUp: // This section processes 'move up' key press
     test byte ptr [bPressedUp], 80
@@ -243,11 +309,14 @@ mainUpdateLoop:
     fld dword ptr [ecx+38]
 //  db 83 39 02 D9 41 38
 
+unregistersymbol(bToggleMirrorWorld);
 unregistersymbol(bInMirrorWorld);
+unregistersymbol(bAlwaysRememberBird);
 unregistersymbol(fSpeedMoveDown);
 unregistersymbol(fSpeedMoveUp);
 unregistersymbol(fSpeedMoveRight);
 unregistersymbol(fSpeedMoveLeft);
+unregistersymbol(dwKeyRememberBird);
 unregistersymbol(dwKeyDown);
 unregistersymbol(dwKeyUp);
 unregistersymbol(dwKeyRight);
@@ -257,6 +326,166 @@ unregisterSymbol(mainUpdateLoop);
 unregistersymbol(_rememberBirdPtr);
 
 </AssemblerScript>
+      <CheatEntries>
+        <CheatEntry>
+          <ID>15</ID>
+          <Description>"Always remember bird to control (without the need to press a key)"</Description>
+          <DropDownList ReadOnly="1" DescriptionOnly="1" DisplayValueAsItem="1">0:Key press neeeded
+1:Always remember
+</DropDownList>
+          <LastState Value="??" Activated="0" RealAddress="00000000"/>
+          <Color>80000008</Color>
+          <VariableType>4 Bytes</VariableType>
+          <Address>bAlwaysRememberBird</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>12</ID>
+          <Description>"Is playing Mirror World?"</Description>
+          <DropDownList ReadOnly="1" DescriptionOnly="1" DisplayValueAsItem="1">0:No
+1:Yes
+</DropDownList>
+          <LastState Value="??" Activated="0" RealAddress="00000000"/>
+          <Color>80000008</Color>
+          <VariableType>4 Bytes</VariableType>
+          <Address>bInMirrorWorld</Address>
+          <Hotkeys>
+            <Hotkey>
+              <Action>Set Value</Action>
+              <Keys>
+                <Key>221</Key>
+              </Keys>
+              <Value>0</Value>
+              <Description>Tell the script the player is in Normal World</Description>
+              <ID>0</ID>
+            </Hotkey>
+            <Hotkey>
+              <Action>Set Value</Action>
+              <Keys>
+                <Key>219</Key>
+              </Keys>
+              <Value>1</Value>
+              <Description>Tell the script the player is in Mirror World</Description>
+              <ID>1</ID>
+            </Hotkey>
+          </Hotkeys>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>4</ID>
+          <Description>"Key Assignments"</Description>
+          <Options moManualExpandCollapse="1" moAllowManualCollapseAndExpand="1"/>
+          <LastState Value="" Activated="0" RealAddress="00000000"/>
+          <Color>80000008</Color>
+          <GroupHeader>1</GroupHeader>
+          <CheatEntries>
+            <CheatEntry>
+              <ID>2</ID>
+              <Description>"Move Left Virtual Key Code"</Description>
+              <LastState Value="??" Activated="0" RealAddress="00000000"/>
+              <ShowAsHex>1</ShowAsHex>
+              <Color>80000008</Color>
+              <VariableType>4 Bytes</VariableType>
+              <Address>dwKeyLeft</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>3</ID>
+              <Description>"Move Right Virtual Key Code"</Description>
+              <LastState Value="??" Activated="0" RealAddress="00000000"/>
+              <ShowAsHex>1</ShowAsHex>
+              <Color>80000008</Color>
+              <VariableType>4 Bytes</VariableType>
+              <Address>dwKeyRight</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>5</ID>
+              <Description>"Move Up Virtual Key Code"</Description>
+              <LastState Value="??" Activated="0" RealAddress="00000000"/>
+              <ShowAsHex>1</ShowAsHex>
+              <Color>80000008</Color>
+              <VariableType>4 Bytes</VariableType>
+              <Address>dwKeyUp</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>6</ID>
+              <Description>"Move Down Virtual Key Code"</Description>
+              <LastState Value="??" Activated="0" RealAddress="00000000"/>
+              <ShowAsHex>1</ShowAsHex>
+              <Color>80000008</Color>
+              <VariableType>4 Bytes</VariableType>
+              <Address>dwKeyDown</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>14</ID>
+              <Description>"Remember Bird Virtual Key Code"</Description>
+              <LastState Value="??" Activated="0" RealAddress="00000000"/>
+              <ShowAsHex>1</ShowAsHex>
+              <Color>80000008</Color>
+              <VariableType>4 Bytes</VariableType>
+              <Address>dwKeyRememberBird</Address>
+            </CheatEntry>
+          </CheatEntries>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>7</ID>
+          <Description>"Movement Speeds"</Description>
+          <Options moRecursiveSetValue="1" moManualExpandCollapse="1" moAllowManualCollapseAndExpand="1"/>
+          <LastState Value="" Activated="0" RealAddress="00000000"/>
+          <Color>80000008</Color>
+          <GroupHeader>1</GroupHeader>
+          <CheatEntries>
+            <CheatEntry>
+              <ID>8</ID>
+              <Description>"Move Left Speed"</Description>
+              <LastState Value="??" Activated="0" RealAddress="00000000"/>
+              <Color>80000008</Color>
+              <VariableType>Float</VariableType>
+              <Address>fSpeedMoveLeft</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>9</ID>
+              <Description>"Move Right Speed"</Description>
+              <LastState Value="??" Activated="0" RealAddress="00000000"/>
+              <Color>80000008</Color>
+              <VariableType>Float</VariableType>
+              <Address>fSpeedMoveRight</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>10</ID>
+              <Description>"Move Up Speed"</Description>
+              <LastState Value="??" Activated="0" RealAddress="00000000"/>
+              <Color>80000008</Color>
+              <VariableType>Float</VariableType>
+              <Address>fSpeedMoveUp</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>11</ID>
+              <Description>"Move Down Speed"</Description>
+              <LastState Value="??" Activated="0" RealAddress="00000000"/>
+              <Color>80000008</Color>
+              <VariableType>Float</VariableType>
+              <Address>fSpeedMoveDown</Address>
+            </CheatEntry>
+          </CheatEntries>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>13</ID>
+          <Description>"Toggle Normal/Mirror World"</Description>
+          <LastState Value="??" Activated="0" RealAddress="00000000"/>
+          <Color>C0C0C0</Color>
+          <VariableType>4 Bytes</VariableType>
+          <Address>bToggleMirrorWorld</Address>
+          <Hotkeys>
+            <Hotkey>
+              <Action>Set Value</Action>
+              <Keys>
+                <Key>8</Key>
+              </Keys>
+              <Value>1</Value>
+              <Description>Toggles the Mirror World flag</Description>
+              <ID>0</ID>
+            </Hotkey>
+          </Hotkeys>
+        </CheatEntry>
+      </CheatEntries>
     </CheatEntry>
   </CheatEntries>
   <CheatCodes>
@@ -331,7 +560,6 @@ unregistersymbol(_rememberBirdPtr);
    Activate the script by clicking on an empty box next to the function
    in Cheat Engine's list. Then change values of the options you desire
    to activate.
-
    Note: If the top-level function does not expand when you click in
    the empty box, it means that your game is not compatible with this
    version of the table.
@@ -340,7 +568,6 @@ unregistersymbol(_rememberBirdPtr);
    Backspace  - Toggle the world (Mirror or Normal)
    ]          - to the Normal world!
    [          - to the Mirror world!
-
  Note: The world-switching hot keys do not switch the actual world in game;
    it is rather an indication to the cheat-script how to interpret left-right
    movement keys when you are controlling the bird with keyboard.
